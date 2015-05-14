@@ -21,6 +21,11 @@ namespace BlurredImageTest.Droid
     {
         private bool _isDisposed;
 
+        public BlurredImageRenderer()
+        {
+            AutoPackage = false;
+        }
+
         protected override void OnElementChanged(ElementChangedEventArgs<BlurredImage> e)
         {
             base.OnElementChanged(e);
