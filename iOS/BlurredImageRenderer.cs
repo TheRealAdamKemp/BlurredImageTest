@@ -1,4 +1,6 @@
-﻿using UIKit;
+﻿using System.Threading.Tasks;
+using CoreImage;
+using UIKit;
 using Xamarin.Forms;
 using Xamarin.Forms.Platform.iOS;
 
@@ -11,24 +13,40 @@ namespace BlurredImageTest.iOS
 {
     public class BlurredImageRenderer : ImageRenderer
     {
-        private UIVisualEffectView _effectView;
-
         protected override void OnElementChanged(ElementChangedEventArgs<Image> e)
         {
-            base.OnElementChanged(e);
-
-            if (_effectView == null)
+            if (Control == null)
             {
-                _effectView = new UIVisualEffectView(UIBlurEffect.FromStyle(UIBlurEffectStyle.Light));
-                AddSubview(_effectView);
+                SetNativeControl(new BlurredImageView
+                    {
+                        ContentMode = UIViewContentMode.ScaleAspectFit,
+                        ClipsToBounds = true
+                    });
             }
+
+            base.OnElementChanged(e);
         }
 
-        public override void LayoutSubviews()
+        private class BlurredImageView : UIImageView
         {
-            base.LayoutSubviews();
-
-            _effectView.Frame = Bounds;
+            public override UIImage Image
+            {
+                get { return base.Image; }
+                set
+                {
+                    // This may take up to a second so don't block the UI thread.
+                    Task.Run(() =>
+                        {
+                            using (var context = CIContext.Create())
+                            using (var inputImage = CIImage.FromCGImage(value.CGImage))
+                            using (var filter = new CIGaussianBlur() { Image = inputImage, Radius = 5 })
+                            using (var resultImage = context.CreateCGImage(filter.OutputImage, inputImage.Extent))
+                            {
+                                InvokeOnMainThread(() => base.Image = new UIImage(resultImage));
+                            }
+                        });
+                }
+            }
         }
     }
 }
