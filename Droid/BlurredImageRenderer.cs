@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using Android.Content;
 using Android.Graphics;
@@ -26,7 +27,7 @@ namespace BlurredImageTest.Droid
 
             if (Control == null)
             {
-                var imageView = new ImageView(Context);
+                var imageView = new BlurredImageView(Context);
                 SetNativeControl(imageView);
             }
 
@@ -95,8 +96,10 @@ namespace BlurredImageTest.Droid
             ImageSource source = Element.Source;
             if (previous == null || !object.Equals(previous.Source, Element.Source))
             {
-//                ((IElementController)base.Element).SetValueFromRenderer(Image.IsLoadingPropertyKey, true);
-//                ((FormsImageView)base.Control).SkipInvalidate();
+                SetIsLoading(true);
+                ((BlurredImageView)base.Control).SkipInvalidate();
+
+                // I'm not sure where this comes from.
                 Control.SetImageResource(17170445);
                 if (source != null)
                 {
@@ -123,7 +126,7 @@ namespace BlurredImageTest.Droid
                         {
                             bitmap.Dispose();
                         }
-//                        ((IElementController)base.Element).SetValueFromRenderer(Image.IsLoadingPropertyKey, false);
+                        SetIsLoading(false);
                         ((IVisualElementController)base.Element).NativeSizeChanged();
                     }
                 }
@@ -185,6 +188,49 @@ namespace BlurredImageTest.Droid
             output.CopyTo(blurredBitmap);
 
             return blurredBitmap;
+        }
+
+        private class BlurredImageView : ImageView
+        {
+            private bool _skipInvalidate;
+
+            public BlurredImageView(Context context) : base(context)
+            {
+            }
+
+            public override void Invalidate ()
+            {
+                if (this._skipInvalidate) {
+                    this._skipInvalidate = false;
+                    return;
+                }
+                base.Invalidate ();
+            }
+
+            public void SkipInvalidate ()
+            {
+                this._skipInvalidate = true;
+            }
+        }
+
+        private static FieldInfo _isLoadingPropertyKeyFieldInfo;
+
+        private static FieldInfo IsLoadingPropertyKeyFieldInfo
+        {
+            get
+            {
+                if (_isLoadingPropertyKeyFieldInfo == null)
+                {
+                    _isLoadingPropertyKeyFieldInfo = typeof(Image).GetField("IsLoadingPropertyKey", BindingFlags.Static | BindingFlags.NonPublic);
+                }
+                return _isLoadingPropertyKeyFieldInfo;
+            }
+        }
+
+        private void SetIsLoading(bool value)
+        {
+            var fieldInfo = IsLoadingPropertyKeyFieldInfo;
+            ((IElementController)base.Element).SetValueFromRenderer((BindablePropertyKey)fieldInfo.GetValue(null), value);
         }
     }
 }
